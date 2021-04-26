@@ -23,8 +23,7 @@ class ClassificationPreprocessing(PreProcess):
         super().__init__(X, y)
         self.for_after_test_ = None
         self.to_save_probability = None
-        self._for_train=None
-
+        self._for_train = None
 
     def feature_selection(self, number_of_features=None, tech=f_classif, ret=True):
         """
@@ -176,10 +175,12 @@ class ClassificationPreprocessing(PreProcess):
         print(self.confusion_matrix_)
         self.classification_report_ = metrics.classification_report(labels, predictions)
         print(self.classification_report_)
+        self.accuracy_ = metrics.accuracy_score(labels, predictions)
         if self._for_train is None:
             self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(self.target, self.to_save_probability[:, 1])
         else:
-            self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(self._for_train[0], self.to_save_probability[:, 1])
+            self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(self._for_train[0],
+                                                                      self.to_save_probability[:, 1])
         self.auc_ = metrics.auc(self.fpt_, self.tpr_)
         print(self.model_print())
 

@@ -42,7 +42,6 @@ class PreProcess:
     prepossessing and training tool for dummies
     """
     _GLOBAL_MODEL_SETTING: list = ""
-    SAVE = True
 
     def __init__(self, X, y):
         """
@@ -61,9 +60,6 @@ class PreProcess:
         self.confusion_matrix_ = None
         self.classification_report_ = None
         self.model_name = None
-        if not PreProcess.SAVE:
-                console = Console(color_system="windows")
-                console.print(f"[red bold]save set off[/red bold]")
 
     def __str__(self):
         return f"all my preprocessing data"
@@ -128,7 +124,7 @@ class PreProcess:
         consol.log("[green] feature selection started")
         test = SelectKBest(teck, k=number_of_features)
         self.features = test.fit_transform(self.features, self.target)
-        self.features_name = test.get_support(True)
+        self.features_name = self.features_name[test.get_support(True)]
         self.features_size = len(self.features_name)
         consol.log("[green] feature selection done")
         return self.features_name
@@ -163,10 +159,6 @@ class PreProcess:
         plt.show()
 
     def show_features(self):
-        """
-        print you're feathers
-        :return: None
-        """
 
         p = Process(target=PreProcess._print_out, args=[self.features.copy()])
         p.start()
@@ -216,7 +208,7 @@ class PreProcess:
             size: int = data.shape[1]
 
         else:
-            sys.exit("unknown object kind")
+            sys.exit("un know object kind")
 
         return data, size, name
 
