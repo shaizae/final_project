@@ -1,9 +1,10 @@
+import os
 import sys
 import warnings
 from abc import abstractmethod
 from difflib import get_close_matches
 from multiprocessing import Process
-
+from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,11 +38,28 @@ def spelling_fixer(input_string, check_string):
         return input_string
 
 
+def dic_uniting(d1, d2):
+    """
+    unite two dictionaries whit the same parameters and tern the values to list of values
+    :param d1: the first dictionary (type: dict)
+    :param d2: the second dictionary (type: dict)
+    :return:
+    """
+    dd = defaultdict(list)
+
+    for d in (d1, d2):  # you can list as many input dicts as you want here
+        for key, value in d.items():
+            dd[key].append(value)
+    return dd
+
+
 class PreProcess:
     """
     prepossessing and training tool for dummies
     """
     _GLOBAL_MODEL_SETTING: list = ""
+    _K_FOLDS = None
+    _MALTY_PROCESSES = None
 
     def __init__(self, X, y):
         """
@@ -135,6 +153,7 @@ class PreProcess:
         :param changes: list of tuples that the first argument in ech tuple is the parameter and the second is the value
         :return:
         """
+        os.environ["PYTHONWARNINGS"] = "ignore"
         consol = Console(color_system="windows")
         consol.log("[green] greed search hes started")
 
@@ -146,8 +165,9 @@ class PreProcess:
             if not isinstance(value, list):
                 value = [value]
             tamp.update({parmeter: value})
-        self.model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy').fit(self.features,
-                                                                                                 self.target).best_estimator_
+        self.model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=PreProcess._K_FOLDS,
+                                  n_jobs=PreProcess._MALTY_PROCESSES).fit(self.features,
+                                                                          self.target).best_estimator_
 
         consol.log("[green] greed search hes done")
 
@@ -219,9 +239,25 @@ class PreProcess:
         :param new_model_name: the new model name (type: string)
         :return: None
         """
-        self.model = model_for_upload
+        model =pickle.load(open(model_for_upload,'rb'))
+        self.model=sklearn.base.clone(model)
         if new_model_name is not None:
             self.model_name = new_model_name
+
+    @staticmethod
+    def grid_search_k_folds(k_folds=5, multi_proses=100):
+        """
+        limit you're greed search K folds and there multi processing
+        :param k_folds: the number of folds in the validation (type: int)
+        :param multi_proses: number of trades in presses (type: int)
+        :return: Non
+        """
+        PreProcess._K_FOLDS = k_folds
+        cpu_coun = os.cpu_count()
+        if cpu_coun <= multi_proses:
+            PreProcess._MALTY_PROCESSES = cpu_coun - 1
+        else:
+            PreProcess._MALTY_PROCESSES = multi_proses
 
 
 def lists_solver(input_list):

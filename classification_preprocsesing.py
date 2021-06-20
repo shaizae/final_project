@@ -4,7 +4,7 @@ import xgboost as xgb
 from sklearn import metrics
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import f_classif
+from sklearn.feature_selection import f_classif,chi2
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import compute_sample_weight
@@ -25,7 +25,7 @@ class ClassificationPreprocessing(PreProcess):
         self.to_save_probability = None
         self._for_train = None
 
-    def feature_selection(self, number_of_features=None, tech=f_classif, ret=True):
+    def feature_selection(self, number_of_features=None, tech=chi2, ret=True):
         """
         :param tech: decide the scoring technique
         :param number_of_features: the number of features_size that you want to check (type: int)
@@ -123,16 +123,19 @@ class ClassificationPreprocessing(PreProcess):
         """
         if ClassificationPreprocessing.SAVE:
             name = str(name) + ClassificationPreprocessing.ADD_TO_REPORT + ".csv"
-
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
-            if self._for_train is None:
-                file["labels"] = self.target
-                file["group"] = self.group
+            if self.for_after_test_ is None:
+                if self._for_train is None:
+                    file["labels"] = self.target
+                    file["group"] = self.group
+                else:
+                    file["labels"] = self._for_train[0]
+                    file["group"] = self._for_train[1]
+                file.to_csv(name, index=False)
+                self.for_after_test_ = file
             else:
-                file["labels"] = self._for_train[0]
-                file["group"] = self._for_train[1]
-            file.to_csv(name, index=False)
-            self.for_after_test_ = file
+                file=self.for_after_test_
+                file.to_csv(name, index=False)
         else:
             console = Console(color_system="windows")
             console.print(f"[red]save set off[/red]")

@@ -1,17 +1,17 @@
-import os
 import pickle
 from multiprocessing import Pool
 
-import numpy as np
 from imblearn.over_sampling import SMOTE
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
-from sklearn.utils import resample
 from sklearn.model_selection import LeaveOneGroupOut, GroupKFold, StratifiedKFold, GroupShuffleSplit
+from sklearn.utils import resample
+
 from classification_preprocsesing import *
+from postprocess import *
 
 
-class Classification(ClassificationPreprocessing):
+class Classification(ClassificationPreprocessing, PostProcess):
     """
     my classification model
     binary models only
@@ -37,6 +37,8 @@ class Classification(ClassificationPreprocessing):
         else:
             self.group = np.array(range(self.target.shape[0]))
         self.target = self.target.astype(int)
+        # if len(np.unique(self.target)) < 2:
+        #     sys.exit("the target have less then 2 labels")
         self._sacrifice_rate = None
         self._sacrifice_rate_flag = False
         self.best_treshold = None
@@ -51,8 +53,8 @@ class Classification(ClassificationPreprocessing):
     def model_modifying(self, *changes):
         """
         modefing youers model
-        :param changes:
-        :return:
+        :param changes: tuples when [0] is the parameter name and [1] is a list of parameter options
+        :return:None
         """
         changes_list = []
         for i in changes:
@@ -68,7 +70,7 @@ class Classification(ClassificationPreprocessing):
         self._sacrifice_rate_flag = True
 
     @staticmethod
-    def __bootstrap(feature, target, group):
+    def _bootstrap(feature, target, group):
         """
         bootstrap the classification data
         :param feature: the classification features
@@ -113,7 +115,7 @@ class Classification(ClassificationPreprocessing):
 
         return feature, target
 
-    def _voting_systems(self, method, out):
+    def _voting_systems(self, method, out, fix_list=True):
         """
         voting system manager
         :param method: the method that use for voting
@@ -151,8 +153,9 @@ class Classification(ClassificationPreprocessing):
             predictions.append(test[1])
             self.to_save_probability = np.concatenate((self.to_save_probability, test[2]), axis=0)
         self.to_save_probability = self.to_save_probability[2:, :]
-        labels = lists_solver(labels)
-        predictions = lists_solver(predictions)
+        if fix_list:
+            labels = lists_solver(labels)
+            predictions = lists_solver(predictions)
 
         return labels, predictions
 
@@ -243,14 +246,13 @@ class Classification(ClassificationPreprocessing):
         df = pd.DataFrame(data=self.features.copy(), columns=self.features_name.copy())
         df["target"] = self.target.copy()
         df["group"] = self.group.copy()
-        df=df.sort_values(by=["group"])
-        df_comper=df.copy()
+        df = df.sort_values(by=["group"])
+        df_comper = df.copy()
         df = df.groupby("group").mean()
         group = np.unique(self.group.copy())
-        target=df["target"].values
+        target = df["target"].values
         del df["target"]
-        df=df.values
-
+        df = df.values
 
         consol = Console(color_system="windows")
         consol.log("[green] training started")
@@ -260,11 +262,11 @@ class Classification(ClassificationPreprocessing):
         for train_index, test_index in loo.split(X=df, y=target, groups=group):
             train_group, test_group = group[train_index], group[test_index]
 
-            df_train=df_comper.loc[df_comper["group"].isin(train_group)]
-            target_train=df_train["target"].values
+            df_train = df_comper.loc[df_comper["group"].isin(train_group)]
+            target_train = df_train["target"].values
             del df_train["target"]
             del df_train["group"]
-            feature_train=df_train.values
+            feature_train = df_train.values
 
             df_test = df_comper.loc[df_comper["group"].isin(test_group)]
             target_test = df_test["target"].values
@@ -313,7 +315,7 @@ class Classification(ClassificationPreprocessing):
 
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
-            self._for_train=[target_test,test_group]
+            self._for_train = [target_test, test_group]
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -330,25 +332,112 @@ class Classification(ClassificationPreprocessing):
             consol.log("[green] training done")
             super()._classification_local_report(labels=labels, predictions=predictions)
 
+    def K_folds_nested(self, N_features, number_of_folds=5, method="no_vote"):
+        """
+         do classification of y from X white K folds
+        :param N_features: the number of features for greed serch (type: list of int)
+        :param number_of_folds: the number folds that you want to use (type: int)
+        :param method: disease the voting method of the data (type:string)
+        :return: the trained model
+        """
+        voting_systems = ["majority_vote", "most_likelihoods", "no_vote"]
+        method = spelling_fixer(method, voting_systems)
+        consol = Console(color_system="windows")
+        consol.log("[green] training started")
+        try:
+            group = np.squeeze(self.group)
+        except:
+            group = self.group.copy()
+        self.__modified = False
+        loo = GroupKFold(number_of_folds)
+        loo.get_n_splits(X=self.features, y=self.target, groups=group)
+        number_of_featchers_out = []
+        params_out = []
+
+        for train_index, test_index in loo.split(X=self.features, y=self.target, groups=self.group):
+            feature_train, feature_test = self.features[train_index], self.features[test_index]
+            target_train, target_test = self.target[train_index], self.target[test_index]
+            train_group, test_group = self.group[train_index], self.group[test_index]
+
+            acc_test = 0
+            number_of_feathers = []
+            parameters = []
+            for number in N_features:
+                test = SelectKBest(chi2, k=number)
+                features_train_after = test.fit_transform(feature_train, target_train)
+                feature_test_after = feature_test[:, test.get_support(True)]
+
+                changes = Classification._GLOBAL_MODEL_SETTING
+                tamp = {}
+                parms = list(self.model.get_params().keys())
+
+                for parmeter, value in changes:
+                    parmeter = spelling_fixer(parmeter, parms)
+
+                    if not isinstance(value, list):
+                        value = [value]
+                    tamp.update({parmeter: value})
+                model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=number_of_folds,
+                                     n_jobs=number_of_folds ** 2).fit(
+                    features_train_after,
+                    target_train).best_estimator_
+                send_for_test = (
+                    model, features_train_after, target_train, feature_test_after, target_test, train_group,
+                    test_group)
+
+                if method == "majority_vote":
+                    voted_data = _majority_vote(send_for_test)
+                elif method == "most_likelihoods":
+                    voted_data = _most_likelihood(send_for_test)
+                elif method == "no_vote":
+                    voted_data = _no_vote(send_for_test)
+                else:
+                    sys.exit("un know method")
+
+                label, prediction, probability = voted_data
+                acc = accuracy_score(label, prediction)
+                if acc > acc_test:
+                    number_of_feathers = number
+                    parameters = model.get_params()
+
+            number_of_featchers_out.append(number_of_feathers)
+            params_out.append(parameters)
+
+        number_of_featchers = np.array(number_of_featchers_out)
+        vals, count = np.unique(number_of_featchers, return_counts=True)
+        cosen_number = vals[np.argmax(count)]
+        tamp_params = params_out.pop(0)
+        for i in params_out:
+            tamp_params = dic_uniting(tamp_params, i)
+
+        consol.print("[blue]chosen number of fetchers:")
+        print(cosen_number)
+        consol.print("[blue]the greed search values:")
+        print(tamp_params)
+        consol.log("[green] greed search hes done")
+        return number_of_featchers_out, tamp_params
+
     def save_model(self, model_name: str = "training_model"):
         """
         train a model whit all of you're data and save him for future use
         :param model_name: the name that you want to giv to the model (type: string)
         :return: the trained model
         """
+        consol = Console(color_system="windows")
+        consol.log("[green] training started")
         features = self.features.copy()
         target = self.target.copy()
 
         if Classification.BOOTSTRAP:
-            features, target, _ = Classification.__bootstrap(features, target,
-                                                             self.group)
+            features, target, _ = Classification._bootstrap(features, target,
+                                                            self.group)
         if Classification.SMOOTE:
             features, target = Classification.__smoote(features, target)
         model = self.model.fit(features, target)
 
         with open(model_name, 'wb') as file:
             pickle.dump(model, file)
-
+        consol.log("[green] training done")
         return model
 
     def confidence_threshold_auto(self, min_thr=0.001, steps_thr=0.001, max_thr=1.0):
@@ -451,6 +540,7 @@ class Classification(ClassificationPreprocessing):
         return best_accuracy_, np.around(best_treshold,
                                          3), y_hat_best, best_rate, y_test_missed_classified_index, y_test_best, y_hat_glob, y_test_glob
 
+
     @staticmethod
     def limit_cores(max_cores):
         """
@@ -478,8 +568,8 @@ def _no_vote(arguments_input):
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
     if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification.__bootstrap(feature_train, target_train,
-                                                                              test_group)
+        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
+                                                                             train_group)
     if Classification.SMOOTE:
         feature_train, target_train = Classification.__smoote(feature_train, target_train)
     model.fit(feature_train, target_train)
@@ -499,13 +589,18 @@ def _most_likelihood(arguments_input):
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
     if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification.__bootstrap(feature_train, target_train,
-                                                                              test_group)
+        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
+                                                                             train_group)
     if Classification.SMOOTE:
         feature_train, target_train = Classification.__smoote(feature_train, target_train)
     model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
-    local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
+    try:
+        local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
+    except:
+        target_test = np.reshape(target_test, [target_test.shape[0], 1])
+        test_group = np.reshape(test_group, [test_group.shape[0], 1])
+        local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
     col = list(range(feature_train.shape[1]))
     col = np.append(col, ["target", "group"])
     local_df = pd.DataFrame(local_df, columns=col)
@@ -518,14 +613,20 @@ def _most_likelihood(arguments_input):
         label.append(tamp.iloc[0, -2].tolist())
 
         probability = model.predict_proba(feature)
-        probability_to_one = sum(list(map(lambda x: np.log2(x), probability[:, 1]))) / probability.shape[0]
-        probability_to_zero = sum(list(map(lambda x: np.log2(x), probability[:, 0]))) / probability.shape[0]
-        if probability_to_one > probability_to_zero:
-            prediction = 1
+        if probability.shape[1] == 2:
+            probability_to_one = sum(list(map(lambda x: np.log2(x), probability[:, 1]))) / probability.shape[0]
+            probability_to_zero = sum(list(map(lambda x: np.log2(x), probability[:, 0]))) / probability.shape[0]
+            if probability_to_one > probability_to_zero:
+                prediction = 1
+            else:
+                prediction = 0
+            predictions.append(prediction)
+            probabilities = np.concatenate((probabilities, probability), axis=0)
         else:
-            prediction = 0
-        predictions.append(prediction)
-        probabilities = np.concatenate((probabilities, probability), axis=0)
+            predictions.append(probability[0, 0].astype(int))
+            probability_rebild = np.zeros([probability.shape[0], 2])
+            probability_rebild[:, probability[0, 0].astype(int)] = 1
+            probabilities = np.concatenate((probabilities, probability_rebild), axis=0)
     probabilities = probabilities[2:, :]
 
     out_put = [label, predictions, probabilities]
@@ -540,13 +641,18 @@ def _majority_vote(arguments_input):
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
     if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification.__bootstrap(feature_train, target_train,
-                                                                              test_group)
+        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
+                                                                             train_group)
     if Classification.SMOOTE:
         feature_train, target_train = Classification.__smoote(feature_train, target_train)
     model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
-    local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
+    try:
+        local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
+    except:
+        target_test = np.reshape(target_test, [target_test.shape[0], 1])
+        test_group = np.reshape(test_group, [test_group.shape[0], 1])
+        local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
     col = list(range(feature_train.shape[1]))
     col = np.append(col, ["target", "group"])
     local_df = pd.DataFrame(local_df, columns=col)
