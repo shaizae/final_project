@@ -4,7 +4,7 @@ import xgboost as xgb
 from sklearn import metrics
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import f_classif,chi2
+from sklearn.feature_selection import f_classif, chi2
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import compute_sample_weight
@@ -24,6 +24,8 @@ class ClassificationPreprocessing(PreProcess):
         self.for_after_test_ = None
         self.to_save_probability = None
         self._for_train = None
+        self._roc_labels=[]
+        self._roc_groups=[]
 
     def feature_selection(self, number_of_features=None, tech=chi2, ret=True):
         """
@@ -55,7 +57,7 @@ class ClassificationPreprocessing(PreProcess):
             self.model_name = "support vector machine"
         elif model == "random":
             self.model = RandomForestClassifier()
-            self.model_name = "random forest"
+            self.model_name = "random_forest"
         elif model == "logistic_regression_regulated":
             self.model = LogisticRegressionCV()
             self.model_name = "logistic regression"
@@ -126,15 +128,15 @@ class ClassificationPreprocessing(PreProcess):
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
             if self.for_after_test_ is None:
                 if self._for_train is None:
-                    file["labels"] = self.target
-                    file["group"] = self.group
+                    file["labels"] = self._roc_labels
+                    file["group"] = self._roc_groups
                 else:
                     file["labels"] = self._for_train[0]
                     file["group"] = self._for_train[1]
                 file.to_csv(name, index=False)
                 self.for_after_test_ = file
             else:
-                file=self.for_after_test_
+                file = self.for_after_test_
                 file.to_csv(name, index=False)
         else:
             console = Console(color_system="windows")
@@ -153,11 +155,36 @@ class ClassificationPreprocessing(PreProcess):
         plt.figure(figsize=(fig_size_x, fig_size_y))
         plt.rc("font", family="Times New Roman", size=16)
         plt.rc('axes', linewidth=2)
-        plt.plot(self.fpt_, self.tpr_, label="%s (AUC = %0.2f)" % (self.classifier_name, self.auc_))
+        plt.plot(self.fpr_, self.tpr_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_))
         plt.plot([0, 1], [0, 1], "--r")
         plt.xlabel("1-Specificity", fontdict={"size": 21})
         plt.ylabel("Sensitivity", fontdict={"size": 21})
         plt.legend(loc=legend_location)
+        if name is None:
+            plt.show()
+        else:
+            if ClassificationPreprocessing.SAVE:
+                plt.savefig(str(name + " " + ClassificationPreprocessing.ADD_TO_REPORT + ".png"))
+            else:
+                console = Console(color_system="windows")
+                console.print(f"[red]save set off[/red]")
+
+    def show_det(self, name=None, fig_size_x=7, fig_size_y=7):
+        """
+        show the roc of your classification
+        :param name:the name that you want to give to you're pic
+        :param fig_size_x: the white of the figure
+        :param fig_size_y:the height of the figure
+        :return: None
+        """
+
+        plt.figure(figsize=(fig_size_x, fig_size_y))
+        plt.rc("font", family="Times New Roman", size=16)
+        plt.rc('axes', linewidth=2)
+        plt.plot(self.fpr_det_, self.tpr_det_)
+        plt.xlabel("FA", fontdict={"size": 21})
+        plt.ylabel("Miss", fontdict={"size": 21})
+
         if name is None:
             plt.show()
         else:
@@ -174,18 +201,20 @@ class ClassificationPreprocessing(PreProcess):
         :param predictions: the prediction of ech group
         :return: None
         """
+        print(self.model_print())
         self.confusion_matrix_ = metrics.confusion_matrix(labels, predictions)
         print(self.confusion_matrix_)
         self.classification_report_ = metrics.classification_report(labels, predictions)
         print(self.classification_report_)
         self.accuracy_ = metrics.accuracy_score(labels, predictions)
         if self._for_train is None:
-            self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(self.target, self.to_save_probability[:, 1])
+            self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(self._roc_labels, self.to_save_probability[:, 1])
+            self.fpr_det_, self.tpr_det_, self.threshold_det_ = metrics.det_curve(self._roc_labels,
+                                                                               self.to_save_probability[:, 1])
         else:
-            self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(self._for_train[0],
+            self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(self._for_train[0],
                                                                       self.to_save_probability[:, 1])
-        self.auc_ = metrics.auc(self.fpt_, self.tpr_)
-        print(self.model_print())
+        self.auc_ = metrics.auc(self.fpr_, self.tpr_)
 
     def print_class_waits(self):
         """
@@ -206,7 +235,7 @@ class ClassificationPreprocessing(PreProcess):
         :param plot_point_on_ROC: is you like to show the roc curve now (type:bool)
         :return: report on you're optimal working point (type: dictionary)
         """
-        tpr = self.fpt_
+        tpr = self.fpr_
         fpr = self.tpr_
         n_p = self.target[self.target == 0].shape[0]
         n_n = self.target[self.target == 1].shape[0]

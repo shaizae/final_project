@@ -1,4 +1,3 @@
-import pickle
 from multiprocessing import Pool
 
 from imblearn.over_sampling import SMOTE
@@ -35,7 +34,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
                 console.print(f"[blue]cant use smote on grouped data[/blue]")
                 Classification.SMOOTE = False
         else:
-            self.group = np.array(range(self.target.shape[0]))
+            self.group = np.array(range(self.target.shape[0])).reshape([self.target.shape[0], 1])
         self.target = self.target.astype(int)
         # if len(np.unique(self.target)) < 2:
         #     sys.exit("the target have less then 2 labels")
@@ -173,6 +172,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = self.group.copy()
         loo = LeaveOneGroupOut()
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
+        self._roc_labels=[]
+        self._roc_groups=[]
         out = []
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
@@ -181,6 +182,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+            self._roc_labels.extend(target_test)
+            self._roc_groups.extend(test_group)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -211,6 +214,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = self.group.copy()
         loo = GroupKFold(number_of_folds)
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
+        self._roc_labels = []
+        self._roc_groups = []
         out = []
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=self.group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
@@ -219,6 +224,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+            self._roc_labels.extend(target_test)
+            self._roc_groups.extend(test_group)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -353,11 +360,14 @@ class Classification(ClassificationPreprocessing, PostProcess):
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
         number_of_featchers_out = []
         params_out = []
+        fold_num = 0
 
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=self.group):
-            feature_train, feature_test = self.features[train_index], self.features[test_index]
-            target_train, target_test = self.target[train_index], self.target[test_index]
-            train_group, test_group = self.group[train_index], self.group[test_index]
+            fold_num += 1
+            feature_train, feature_test = self.features[train_index].copy(), self.features[test_index].copy()
+            target_train, target_test = self.target[train_index].copy(), self.target[test_index].copy()
+            train_group, test_group = self.group[train_index].copy(), self.group[test_index].copy()
+            consol.log(f"[green] fold number {fold_num} started from {number_of_folds} folds")
 
             acc_test = 0
             number_of_feathers = []
@@ -378,7 +388,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
                         value = [value]
                     tamp.update({parmeter: value})
                 model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=number_of_folds,
-                                     n_jobs=number_of_folds ** 2).fit(
+                                     n_jobs=PreProcess._MALTY_PROCESSES).fit(
                     features_train_after,
                     target_train).best_estimator_
                 send_for_test = (
@@ -409,6 +419,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
         tamp_params = params_out.pop(0)
         for i in params_out:
             tamp_params = dic_uniting(tamp_params, i)
+
+        tamp_params["n_parameters"]=cosen_number
 
         consol.print("[blue]chosen number of fetchers:")
         print(cosen_number)
@@ -539,7 +551,6 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
         return best_accuracy_, np.around(best_treshold,
                                          3), y_hat_best, best_rate, y_test_missed_classified_index, y_test_best, y_hat_glob, y_test_glob
-
 
     @staticmethod
     def limit_cores(max_cores):

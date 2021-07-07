@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 import warnings
 from abc import abstractmethod
@@ -8,6 +9,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import sklearn
 from rich import print
 from rich.console import Console
 from scipy.signal import savgol_filter as sgf
@@ -16,6 +18,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 
 warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
 
 
 def spelling_fixer(input_string, check_string):
@@ -85,7 +88,7 @@ class PreProcess:
     def __len__(self):
         return self.features.shape[0]
 
-    def preprocessing(self, preprocessing_list=None):
+    def preprocessing(self, preprocessing_list=None, derivative=2):
         """
         the preprocessing sequins for the training set
         :param preprocessing_list: list of the preprocessing methods (type: list)
@@ -93,14 +96,14 @@ class PreProcess:
         norm: normalize the data
         offset: offset the data
         """
-        optinons_list = ["sgf", "norm", "offset", "drop_None"]
+        optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization"]
         for i in preprocessing_list:
             i = spelling_fixer(i, optinons_list)
             if i == "sgf":
                 try:
-                    self.features = sgf(self.features, window_length=13, polyorder=3, deriv=2, mode="nearest")
+                    self.features = sgf(self.features, window_length=13, polyorder=3, deriv=derivative, mode="nearest")
                 except Exception:
-                    self.features = sgf(self.features, window_length=13, polyorder=3, deriv=2, mode="nearest")
+                    self.features = sgf(self.features, window_length=13, polyorder=3, deriv=derivative, mode="nearest")
             elif i == "norm":
                 self.features = MinMaxScaler(feature_range=(0, 1)).fit_transform(self.features)
 
@@ -116,6 +119,15 @@ class PreProcess:
                 self.group = tamp["group"].values
                 del tamp["group"]
                 self.features = tamp.values
+
+            elif i == "opus_normalization":
+                tamp = np.mean(self.features, axis=1)
+                squares = lambda x: x ** 2
+                for num, j in enumerate(tamp):
+                    self.features[num, :] -= j
+                features = np.array(squares(self.features[:, :])).sum(axis=1)
+                for num, j in enumerate(features):
+                    self.features[num, :] /= j
 
     def expend_features(self, expend):
         """
@@ -153,7 +165,7 @@ class PreProcess:
         :param changes: list of tuples that the first argument in ech tuple is the parameter and the second is the value
         :return:
         """
-        os.environ["PYTHONWARNINGS"] = "ignore"
+
         consol = Console(color_system="windows")
         consol.log("[green] greed search hes started")
 
@@ -239,8 +251,8 @@ class PreProcess:
         :param new_model_name: the new model name (type: string)
         :return: None
         """
-        model =pickle.load(open(model_for_upload,'rb'))
-        self.model=sklearn.base.clone(model)
+        model = pickle.load(open(model_for_upload, 'rb'))
+        self.model = sklearn.base.clone(model)
         if new_model_name is not None:
             self.model_name = new_model_name
 
@@ -255,7 +267,7 @@ class PreProcess:
         PreProcess._K_FOLDS = k_folds
         cpu_coun = os.cpu_count()
         if cpu_coun <= multi_proses:
-            PreProcess._MALTY_PROCESSES = cpu_coun - 1
+            PreProcess._MALTY_PROCESSES = cpu_coun - 2
         else:
             PreProcess._MALTY_PROCESSES = multi_proses
 
