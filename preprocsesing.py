@@ -16,6 +16,7 @@ from scipy.signal import savgol_filter as sgf
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
 
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
@@ -88,7 +89,7 @@ class PreProcess:
     def __len__(self):
         return self.features.shape[0]
 
-    def preprocessing(self, preprocessing_list=None, derivative=2):
+    def preprocessing(self, preprocessing_list=None, derivative=2, pca_components=None):
         """
         the preprocessing sequins for the training set
         :param preprocessing_list: list of the preprocessing methods (type: list)
@@ -96,7 +97,7 @@ class PreProcess:
         norm: normalize the data
         offset: offset the data
         """
-        optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization"]
+        optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization", "PCA"]
         for i in preprocessing_list:
             i = spelling_fixer(i, optinons_list)
             if i == "sgf":
@@ -128,6 +129,10 @@ class PreProcess:
                 features = np.array(squares(self.features[:, :])).sum(axis=1)
                 for num, j in enumerate(features):
                     self.features[num, :] /= j
+
+            elif i == "PCA":
+                pca = PCA(n_components=pca_components)
+                self.features = pca.fit_transform(self.features)
 
     def expend_features(self, expend):
         """
@@ -236,7 +241,7 @@ class PreProcess:
 
         elif isinstance(input_data, np.array):
             data = input_data
-            name = "numpy_array_have_no_name"
+            name = None
             size: int = data.shape[1]
 
         else:

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import xgboost as xgb
 from sklearn import metrics
 from sklearn import svm
@@ -24,8 +25,6 @@ class ClassificationPreprocessing(PreProcess):
         self.for_after_test_ = None
         self.to_save_probability = None
         self._for_train = None
-        self._roc_labels=[]
-        self._roc_groups=[]
 
     def feature_selection(self, number_of_features=None, tech=chi2, ret=True):
         """
@@ -128,8 +127,8 @@ class ClassificationPreprocessing(PreProcess):
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
             if self.for_after_test_ is None:
                 if self._for_train is None:
-                    file["labels"] = self._roc_labels
-                    file["group"] = self._roc_groups
+                    file["labels"] = self.target
+                    file["group"] = self.group
                 else:
                     file["labels"] = self._for_train[0]
                     file["group"] = self._for_train[1]
@@ -155,8 +154,10 @@ class ClassificationPreprocessing(PreProcess):
         plt.figure(figsize=(fig_size_x, fig_size_y))
         plt.rc("font", family="Times New Roman", size=16)
         plt.rc('axes', linewidth=2)
-        plt.plot(self.fpr_, self.tpr_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_))
+        plt.plot(self.fpr_, self.tpr_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_roc_))
         plt.plot([0, 1], [0, 1], "--r")
+        if self.name is not None:
+            plt.title("ROC: " + str(self.name) + " " + str(self.features_size))
         plt.xlabel("1-Specificity", fontdict={"size": 21})
         plt.ylabel("Sensitivity", fontdict={"size": 21})
         plt.legend(loc=legend_location)
@@ -169,10 +170,11 @@ class ClassificationPreprocessing(PreProcess):
                 console = Console(color_system="windows")
                 console.print(f"[red]save set off[/red]")
 
-    def show_det(self, name=None, fig_size_x=7, fig_size_y=7):
+    def show_det(self, name=None, legend_location=4, fig_size_x=7, fig_size_y=7):
         """
         show the roc of your classification
         :param name:the name that you want to give to you're pic
+        :param legend_location: which corner you put the legend
         :param fig_size_x: the white of the figure
         :param fig_size_y:the height of the figure
         :return: None
@@ -181,9 +183,13 @@ class ClassificationPreprocessing(PreProcess):
         plt.figure(figsize=(fig_size_x, fig_size_y))
         plt.rc("font", family="Times New Roman", size=16)
         plt.rc('axes', linewidth=2)
-        plt.plot(self.fpr_det_, self.tpr_det_)
+        plt.plot(self.fpr_det_, self.tpr_det_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_det_))
+        if self.name is not None:
+            plt.title("det: " + str(self.name) + " " + str(self.features_size))
+        plt.plot([0, 1], [0, 1], "--r")
         plt.xlabel("FA", fontdict={"size": 21})
         plt.ylabel("Miss", fontdict={"size": 21})
+        plt.legend(loc=legend_location)
 
         if name is None:
             plt.show()
@@ -194,7 +200,7 @@ class ClassificationPreprocessing(PreProcess):
                 console = Console(color_system="windows")
                 console.print(f"[red]save set off[/red]")
 
-    def _classification_local_report(self, labels, predictions):
+    def _classification_local_report(self, labels, predictions, roc_labels):
         """
         analise the classification that currently happened
         :param labels: the labels of ech group
@@ -208,13 +214,14 @@ class ClassificationPreprocessing(PreProcess):
         print(self.classification_report_)
         self.accuracy_ = metrics.accuracy_score(labels, predictions)
         if self._for_train is None:
-            self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(self._roc_labels, self.to_save_probability[:, 1])
-            self.fpr_det_, self.tpr_det_, self.threshold_det_ = metrics.det_curve(self._roc_labels,
-                                                                               self.to_save_probability[:, 1])
+            self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(roc_labels, self.to_save_probability[:, 1])
+            self.fpr_det_, self.tpr_det_, self.threshold_det_ = metrics.det_curve(roc_labels,
+                                                                                  self.to_save_probability[:, 1])
         else:
             self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(self._for_train[0],
                                                                       self.to_save_probability[:, 1])
-        self.auc_ = metrics.auc(self.fpr_, self.tpr_)
+        self.auc_roc_ = metrics.auc(self.fpr_, self.tpr_)
+        self.auc_det_ = metrics.auc(self.fpr_det_, self.tpr_det_)
 
     def print_class_waits(self):
         """

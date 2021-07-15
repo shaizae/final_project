@@ -172,8 +172,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = self.group.copy()
         loo = LeaveOneGroupOut()
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
-        self._roc_labels=[]
-        self._roc_groups=[]
+        roc_labels=[]
         out = []
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
@@ -182,8 +181,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
-            self._roc_labels.extend(target_test)
-            self._roc_groups.extend(test_group)
+            roc_labels.extend(target_test)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -197,7 +195,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             self.leave_one_out(method=method)
         else:
             consol.log("[green] training done")
-            super()._classification_local_report(labels=labels, predictions=predictions)
+            super()._classification_local_report(labels=labels, predictions=predictions,roc_labels=roc_labels)
 
     def K_folds(self, number_of_folds=5, method="no_vote"):
         """
@@ -214,8 +212,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = self.group.copy()
         loo = GroupKFold(number_of_folds)
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
-        self._roc_labels = []
-        self._roc_groups = []
+        roc_labels = []
         out = []
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=self.group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
@@ -224,8 +221,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
-            self._roc_labels.extend(target_test)
-            self._roc_groups.extend(test_group)
+            roc_labels.extend(target_test)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -240,7 +236,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             self.K_folds(number_of_folds=number_of_folds, method=method)
         else:
             consol.log("[green] training done")
-            super()._classification_local_report(labels=labels, predictions=predictions)
+            super()._classification_local_report(labels=labels, predictions=predictions,roc_labels=roc_labels)
 
     def K_folds_stratified(self, number_of_folds=5, method="no_vote"):
         """
