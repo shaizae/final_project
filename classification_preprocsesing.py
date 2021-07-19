@@ -9,6 +9,7 @@ from sklearn.feature_selection import f_classif, chi2
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import compute_sample_weight
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from preprocsesing import *
 
@@ -43,7 +44,8 @@ class ClassificationPreprocessing(PreProcess):
         deists the learning classification algorithm
         :param model: the nam of thr model you kile to use
         """
-        methods_list = ["xgboost", "gauss", "svm", "random", "logistic_regression_regulated", "logistic_regression"]
+        methods_list = ["xgboost", "gauss", "svm", "random", "logistic_regression_regulated", "logistic_regression",
+                        "LDA"]
         model = spelling_fixer(model, methods_list)
         if model == "xgboost":
             self.model = xgb.XGBClassifier()
@@ -63,6 +65,9 @@ class ClassificationPreprocessing(PreProcess):
         elif model == "logistic_regression":
             self.model = LogisticRegression()
             self.model_name = "logistic regression"
+        elif model == "LDA":
+            self.model = LinearDiscriminantAnalysis()
+            self.model_name = "LDA"
 
     def save_classification_report(self, name):
         """
@@ -102,7 +107,7 @@ class ClassificationPreprocessing(PreProcess):
                 file.write("\n")
                 file.write("aria under cave")
                 file.write("\n")
-                file.write(str(self.auc_))
+                file.write(str(self.auc_roc_))
                 file.write("\n")
                 file.write(str(self.model_print(True)))
                 file.write("\n")

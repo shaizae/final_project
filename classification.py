@@ -45,6 +45,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         self.to_save_probability = None
         super()._class_mod_dis(model=model)
         self.__modified = True
+        self.roc_index=[]
 
     def __str__(self):
         return f"all my group classification tools"
@@ -172,7 +173,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = self.group.copy()
         loo = LeaveOneGroupOut()
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
-        roc_labels=[]
+        roc_labels = []
+
         out = []
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
@@ -182,6 +184,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
             roc_labels.extend(target_test)
+            self.roc_index.extend(test_index)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -195,7 +198,9 @@ class Classification(ClassificationPreprocessing, PostProcess):
             self.leave_one_out(method=method)
         else:
             consol.log("[green] training done")
-            super()._classification_local_report(labels=labels, predictions=predictions,roc_labels=roc_labels)
+            super()._classification_local_report(labels=labels, predictions=predictions, roc_labels=roc_labels)
+            self.roc_groups= self.group[self.roc_index]
+            self.roc_labels=self.target[self.roc_index]
 
     def K_folds(self, number_of_folds=5, method="no_vote"):
         """
@@ -222,6 +227,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             out.append(
                 [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
             roc_labels.extend(target_test)
+            self.roc_index.extend(test_index)
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -236,7 +242,10 @@ class Classification(ClassificationPreprocessing, PostProcess):
             self.K_folds(number_of_folds=number_of_folds, method=method)
         else:
             consol.log("[green] training done")
-            super()._classification_local_report(labels=labels, predictions=predictions,roc_labels=roc_labels)
+            super()._classification_local_report(labels=labels, predictions=predictions, roc_labels=roc_labels)
+            self.roc_groups= self.group[self.roc_index]
+            self.roc_labels=self.target[self.roc_index]
+
 
     def K_folds_stratified(self, number_of_folds=5, method="no_vote"):
         """
@@ -416,7 +425,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         for i in params_out:
             tamp_params = dic_uniting(tamp_params, i)
 
-        tamp_params["n_parameters"]=cosen_number
+        tamp_params["n_parameters"] = cosen_number
 
         consol.print("[blue]chosen number of fetchers:")
         print(cosen_number)

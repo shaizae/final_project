@@ -70,18 +70,8 @@ class PreProcess:
         :param X: the features of the data (type: DataFrame or Series)
         :param y: the target of the data (type: DataFrame or Series)
         """
-        self.group = None
         self.features, self.features_size, self.features_name = self._input_sequence(X)
         self.target, self.target_size, self.name = self._input_sequence(y)
-        self.auc_ = None
-        self.fpt_ = None
-        self.threshold_ = None
-        self.tpr_ = None
-        self.classifier_name = None
-        self.model = None
-        self.confusion_matrix_ = None
-        self.classification_report_ = None
-        self.model_name = None
 
     def __str__(self):
         return f"all my preprocessing data"
@@ -110,6 +100,7 @@ class PreProcess:
 
             elif i == "offset":
                 self.features = self.features - np.min(self.features)
+
             elif i == "drop_None":
                 tamp = np.concatenate((self.features, self.target, self.group), axis=1)
                 col = np.reshape(self.features_name, [self.features_name.shape[0], 1])
@@ -187,6 +178,16 @@ class PreProcess:
                                                                           self.target).best_estimator_
 
         consol.log("[green] greed search hes done")
+
+    def group_by(self):
+        df = np.concatenate([self.features, self.target, self.group], axis=1)
+        col = lists_solver([self.features_name.tolist(), self.name, "group"])
+        df = pd.DataFrame(data=df, columns=col).groupby("group").mean()
+        features = df.iloc[:, :-1]
+        target = df.iloc[:, -1]
+        self.features=features.copy()
+        self.target=target.copy()
+        self.group = np.array(range(self.target.shape[0])).reshape([self.target.shape[0], 1])
 
     @staticmethod
     def _print_out(data):
@@ -285,7 +286,7 @@ def lists_solver(input_list):
     """
     list_out = []
     for i in input_list:
-        if isinstance(i, list):
+        if isinstance(i, list or np.array):
             beck = lists_solver(i)
             list_out.extend(beck)
         else:

@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 import warnings
+from preprocsesing import lists_solver
 
 warnings.simplefilter("ignore")
 
@@ -27,8 +28,8 @@ class PostProcess:
         if self.for_after_test_ is None:
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
             if self._for_train is None:
-                file["labels"] = self.target
-                file["group"] = self.group
+                file["labels"] = lists_solver(self.roc_labels.tolist())
+                file["group"] =lists_solver(self.roc_groups.tolist())
             else:
                 file["labels"] = self._for_train[0]
                 file["group"] = self._for_train[1]
@@ -37,7 +38,7 @@ class PostProcess:
             file = self.for_after_test_.copy()
         return file
 
-    def LLR_threshold(self, show_roc=True):
+    def LLR_threshold(self, show_roc=None):
 
         """
         shows the ROC curve for LLR
@@ -71,11 +72,11 @@ class PostProcess:
         voting = np.array(voting).astype(float)
         self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(labels, voting)
         self.auc_ = metrics.auc(self.fpt_, self.tpr_)
-        if show_roc:
-            self.__show_roc("LLR_treshold")
+        if show_roc is not None:
+            self.__show_roc(show_roc)
         return df_save
 
-    def LLR(self, threshold=0):
+    def LLR(self, threshold=0,show_roc=None):
         """
         classing by log likelihood ratio vote
         :param threshold: the threshold for disease who is one (type: float)
@@ -112,6 +113,8 @@ class PostProcess:
         voting = np.array(voting).astype(float)
         self.fpt_, self.tpr_, self.threshold_ = metrics.roc_curve(labels, voting)
         self.auc_ = metrics.auc(self.fpt_, self.tpr_)
+        if show_roc is not None:
+            self.__show_roc(show_roc)
 
         return df_save
 
@@ -192,7 +195,10 @@ class PostProcess:
         plt.xlabel("1-Specificity", fontdict={"size": 21})
         plt.ylabel("Sensitivity", fontdict={"size": 21})
         plt.legend(loc=legend_location)
-        plt.show()
+        if titel is None:
+            plt.show()
+        else:
+            plt.savefig(str(titel+ ".png"))
 
     def sigmoid_confidence_interval(self):
         self._probabilities_crating()
