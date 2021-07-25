@@ -1,15 +1,13 @@
 from datetime import datetime
-
-import matplotlib.pyplot as plt
 import xgboost as xgb
 from sklearn import metrics
 from sklearn import svm
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import f_classif, chi2
+from sklearn.feature_selection import chi2
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import compute_sample_weight
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from preprocsesing import *
 
@@ -76,7 +74,7 @@ class ClassificationPreprocessing(PreProcess):
         :return: None
         """
         if ClassificationPreprocessing.SAVE:
-            present_matrix = np.zeros((2, 2))
+            present_matrix = np.zeros((2, 2))  # crating percent base confusion matrix
             present_matrix[0, 0] = self.confusion_matrix_[0, 0] / (
                     self.confusion_matrix_[0, 0] + self.confusion_matrix_[0, 1]) * 100
             present_matrix[0, 1] = self.confusion_matrix_[0, 1] / (
@@ -86,7 +84,7 @@ class ClassificationPreprocessing(PreProcess):
             present_matrix[1, 1] = self.confusion_matrix_[1, 1] / (
                     self.confusion_matrix_[1, 0] + self.confusion_matrix_[1, 1]) * 100
             file_name = str(name + " " + ClassificationPreprocessing.ADD_TO_REPORT + ".txt")
-            with open(file_name, "w+")as file:
+            with open(file_name, "w+")as file:  # wraith all the parameters to the report
                 file.write("classifier: ")
                 file.write(self.model_name)
                 file.write("\n")
@@ -130,7 +128,7 @@ class ClassificationPreprocessing(PreProcess):
         if ClassificationPreprocessing.SAVE:
             name = str(name) + ClassificationPreprocessing.ADD_TO_REPORT + ".csv"
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
-            if self.for_after_test_ is None:
+            if self.for_after_test_ is None:  # check if train test split happened
                 if self._for_train is None:
                     file["labels"] = self.target
                     file["group"] = self.group
@@ -156,11 +154,11 @@ class ClassificationPreprocessing(PreProcess):
         :return: None
         """
 
-        plt.figure(figsize=(fig_size_x, fig_size_y))
+        plt.figure(figsize=(fig_size_x, fig_size_y))  # set the plot parameters
         plt.rc("font", family="Times New Roman", size=16)
         plt.rc('axes', linewidth=2)
         plt.plot(self.fpr_, self.tpr_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_roc_))
-        plt.plot([0, 1], [0, 1], "--r")
+        plt.plot([0, 1], [0, 1], "--r")  # add the Dashed red line
         if self.name is not None:
             plt.title("ROC: " + str(self.name) + " " + str(self.features_size))
         plt.xlabel("1-Specificity", fontdict={"size": 21})
@@ -191,7 +189,7 @@ class ClassificationPreprocessing(PreProcess):
         plt.plot(self.fpr_det_, self.tpr_det_, label="%s (AUC = %0.2f)" % (self.model_name, self.auc_det_))
         if self.name is not None:
             plt.title("det: " + str(self.name) + " " + str(self.features_size))
-        plt.plot([0, 1], [0, 1], "--r")
+        plt.plot([0, 1], [0, 1], "--r")  # add the Dashed red line
         plt.xlabel("FA", fontdict={"size": 21})
         plt.ylabel("Miss", fontdict={"size": 21})
         plt.legend(loc=legend_location)
@@ -212,12 +210,13 @@ class ClassificationPreprocessing(PreProcess):
         :param predictions: the prediction of ech group
         :return: None
         """
-        print(self.model_print())
-        self.confusion_matrix_ = metrics.confusion_matrix(labels, predictions)
+        print(self.model_print())  # print the model hyper parameters
+        self.confusion_matrix_ = metrics.confusion_matrix(labels, predictions)  # crate the confusion matrix
         print(self.confusion_matrix_)
-        self.classification_report_ = metrics.classification_report(labels, predictions)
+        self.classification_report_ = metrics.classification_report(labels,
+                                                                    predictions)  # crating the classification report
         print(self.classification_report_)
-        self.accuracy_ = metrics.accuracy_score(labels, predictions)
+        self.accuracy_ = metrics.accuracy_score(labels, predictions)  # calculate the accuracy
         if self._for_train is None:
             self.fpr_, self.tpr_, self.threshold_ = metrics.roc_curve(roc_labels, self.to_save_probability[:, 1])
             self.fpr_det_, self.tpr_det_, self.threshold_det_ = metrics.det_curve(roc_labels,

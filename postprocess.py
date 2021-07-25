@@ -19,17 +19,16 @@ class PostProcess:
         self.fpt_, self.tpr_, self.threshold_ = None, None, None
         self.auc_ = None
 
-
     def _probabilities_crating(self):
         """
         crating the statistics block that use for the model
         :return: the statistics file that we using in the model
         """
-        if self.for_after_test_ is None:
+        if self.for_after_test_ is None:  # chek if used by Classification or it individual class
             file = pd.DataFrame(data=self.to_save_probability, columns=range(self.to_save_probability.shape[1]))
             if self._for_train is None:
                 file["labels"] = lists_solver(self.roc_labels.tolist())
-                file["group"] =lists_solver(self.roc_groups.tolist())
+                file["group"] = lists_solver(self.roc_groups.tolist())
             else:
                 file["labels"] = self._for_train[0]
                 file["group"] = self._for_train[1]
@@ -44,24 +43,24 @@ class PostProcess:
         shows the ROC curve for LLR
         :return: the voting between groups inside sigmoid (type: for_after_test_)
         """
-        self._probabilities_crating()
+        self._probabilities_crating()  # crate the probity's
         df = self.for_after_test_.copy()
         groups = self.for_after_test_.loc[:, "group"].values
-        groups = np.unique(groups)
+        groups = np.unique(groups)  # find tge group to run on them
 
         voting = []
         labels = []
 
         for group in groups:
-            tamp = df.loc[df.loc[:, "group"] == group, :]
-            normalize_size = tamp.shape[0]
+            tamp = df.loc[df.loc[:, "group"] == group, :]  # separate c certain group
+            normalize_size = tamp.shape[0]  # save the size for normalization
             labels.append(tamp.iloc[0, 2].copy())
             tamp = tamp.loc[:, 0:1].values
-            desigen_logic = np.log2(tamp)
+            desigen_logic = np.log2(tamp)  # use log white base 2 on the scores
             LLR_zero = np.sum(desigen_logic[:, 0]) / normalize_size
             LLR_ones = np.sum(desigen_logic[:, 1]) / normalize_size
             LLR = LLR_ones - LLR_zero
-            LLR = _sigmoid(LLR)
+            LLR = _sigmoid(LLR)  # use sigmoid to calculate score
             voting.append(LLR)
 
         df_save = pd.DataFrame()
@@ -76,13 +75,13 @@ class PostProcess:
             self.__show_roc(show_roc)
         return df_save
 
-    def LLR(self, threshold=0,show_roc=None):
+    def LLR(self, threshold=0, show_roc=None):
         """
         classing by log likelihood ratio vote
         :param threshold: the threshold for disease who is one (type: float)
         :return: the voting between groups (type: for_after_test_)
         """
-        self._probabilities_crating()
+        self._probabilities_crating()  # crate the probity's
         df = self.for_after_test_
         groups = df.loc[:, "group"].values
         groups = np.unique(groups)
@@ -91,15 +90,15 @@ class PostProcess:
         labels = []
 
         for group in groups:
-            tamp = df.loc[df.loc[:, "group"] == group, :]
-            normalize_size = tamp.shape[0]
+            tamp = df.loc[df.loc[:, "group"] == group, :]  # separate c certain group
+            normalize_size = tamp.shape[0]  # save the size for normalization
             labels.append(tamp.iloc[0, 2].copy())
             tamp = tamp.iloc[:, :2].values
             designed_logic = np.log2(tamp)
             LLR_zero = np.sum(designed_logic[:, 0]) / normalize_size
             LLR_ones = np.sum(designed_logic[:, 1]) / normalize_size
             LLR = LLR_ones - LLR_zero
-            LLR = _sigmoid(LLR)
+            LLR = _sigmoid(LLR)  # use sigmoid for voting
             if LLR <= threshold:
                 voting.append(0)
             else:
@@ -124,7 +123,7 @@ class PostProcess:
         :param threshold: the threshold for disease who is one (type: float between 0 to 1)
         :return: the voting between groups (type: for_after_test_)
         """
-        self._probabilities_crating()
+        self._probabilities_crating()  # crate the probity's
         df = self.for_after_test_.copy()
         groups = df.loc[:, "group"].values
         groups = np.unique(groups)
@@ -133,11 +132,11 @@ class PostProcess:
         labels = []
 
         for group in groups:
-            tamp = df.loc[df.loc[:, "group"] == group, :]
+            tamp = df.loc[df.loc[:, "group"] == group, :]  # separate c certain group
             labels.append(tamp.iloc[0, 2].copy())
             tamp = tamp.loc[:, 0:1].values
             tamp = tamp > threshold
-            tamp = tamp + np.zeros([tamp.shape[0], tamp.shape[1]])
+            tamp = tamp + np.zeros([tamp.shape[0], tamp.shape[1]])  # convert to  one and zeros by threshold
             onse = np.sum(tamp[:, 1])
             zerose = np.sum(tamp[:, 0])
             if onse > zerose:
@@ -163,11 +162,13 @@ class PostProcess:
         :param removing_threshold: the threshold presents (type: folate between 0 to 1)
         :return: the probebilitis file after voting
         """
-        self._probabilities_crating()
+        self._probabilities_crating()  # crate the probity's
         df = self.for_after_test_[1].values.copy()
-        val, pdf_count = np.unique(df, return_counts=True)
-        count = np.max(pdf_count) * removing_threshold
-        count = np.where(pdf_count >= count)
+        val, pdf_count = np.unique(df,
+                                   return_counts=True)  # find all the values in the spectra and count the timesa
+        # they shone
+        count = np.max(pdf_count) * removing_threshold  # find the maximum value
+        count = np.where(pdf_count >= count)  # find al the values that over the threshold
         val = val[count]
         seen = []
         for i in val:
@@ -198,7 +199,7 @@ class PostProcess:
         if titel is None:
             plt.show()
         else:
-            plt.savefig(str(titel+ ".png"))
+            plt.savefig(str(titel + ".png"))
 
     def sigmoid_confidence_interval(self):
         self._probabilities_crating()

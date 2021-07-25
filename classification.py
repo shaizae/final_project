@@ -3,7 +3,7 @@ from multiprocessing import Pool
 from imblearn.over_sampling import SMOTE
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import LeaveOneGroupOut, GroupKFold, StratifiedKFold, GroupShuffleSplit
+from sklearn.model_selection import LeaveOneGroupOut, GroupKFold, StratifiedKFold
 from sklearn.utils import resample
 
 from classification_preprocsesing import *
@@ -52,7 +52,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
     def model_modifying(self, *changes):
         """
-        modefing youers model
+        modifying your model
         :param changes: tuples when [0] is the parameter name and [1] is a list of parameter options
         :return:None
         """

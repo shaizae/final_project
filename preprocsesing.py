@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 
 
-def spelling_fixer(input_string, check_string):
+def spelling_fixer(input_string, check_string):  # we had some dyslectic on the crow
     """
     fixing minor spelling mistakes
     :param input_string: the word you like to compere (type: string)
@@ -90,18 +90,19 @@ class PreProcess:
         optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization", "PCA"]
         for i in preprocessing_list:
             i = spelling_fixer(i, optinons_list)
-            if i == "sgf":
+            if i == "sgf":  # using sagalov filter to smote and divert data (it's c++ librerry os its not clean memory
+                # so leave the try alone)
                 try:
                     self.features = sgf(self.features, window_length=13, polyorder=3, deriv=derivative, mode="nearest")
                 except Exception:
                     self.features = sgf(self.features, window_length=13, polyorder=3, deriv=derivative, mode="nearest")
-            elif i == "norm":
+            elif i == "norm":  # normalize the data
                 self.features = MinMaxScaler(feature_range=(0, 1)).fit_transform(self.features)
 
-            elif i == "offset":
+            elif i == "offset":  # do offset to the data
                 self.features = self.features - np.min(self.features)
 
-            elif i == "drop_None":
+            elif i == "drop_None":  # drop None from the data
                 tamp = np.concatenate((self.features, self.target, self.group), axis=1)
                 col = np.reshape(self.features_name, [self.features_name.shape[0], 1])
                 col = np.append(col, ["target", "group"])
@@ -112,7 +113,7 @@ class PreProcess:
                 del tamp["group"]
                 self.features = tamp.values
 
-            elif i == "opus_normalization":
+            elif i == "opus_normalization":  # copy of the oups normalization technic
                 tamp = np.mean(self.features, axis=1)
                 squares = lambda x: x ** 2
                 for num, j in enumerate(tamp):
@@ -121,7 +122,7 @@ class PreProcess:
                 for num, j in enumerate(features):
                     self.features[num, :] /= j
 
-            elif i == "PCA":
+            elif i == "PCA":  # do PCA to all the data
                 pca = PCA(n_components=pca_components)
                 self.features = pca.fit_transform(self.features)
 
@@ -148,7 +149,7 @@ class PreProcess:
         """
         consol = Console(color_system="windows")
         consol.log("[green] feature selection started")
-        test = SelectKBest(teck, k=number_of_features)
+        test = SelectKBest(teck, k=number_of_features)  # do the fetcher selection
         self.features = test.fit_transform(self.features, self.target)
         self.features_name = self.features_name[test.get_support(True)]
         self.features_size = len(self.features_name)
@@ -167,7 +168,7 @@ class PreProcess:
 
         tamp = {}
         parms = list(self.model.get_params().keys())
-        for parmeter, value in changes:
+        for parmeter, value in changes:  # save the data as dictionary so its can be used
             parmeter = spelling_fixer(parmeter, parms)
 
             if not isinstance(value, list):
@@ -176,19 +177,18 @@ class PreProcess:
 
         gss = GroupShuffleSplit(n_splits=1, train_size=0.9, random_state=42)
         gss.get_n_splits()
-        for train_idx, test_idx in gss.split(self.features,self.target, self.group):
-            features=self.features[test_idx]
-            target=self.target[test_idx]
-            self.features=self.features[train_idx]
-            self.target=self.target[train_idx]
-            self.group=self.group[train_idx]
+        for train_idx, test_idx in gss.split(self.features, self.target, self.group):  # this loop splitting dav out
+            features = self.features[test_idx]
+            target = self.target[test_idx]
+            self.features = self.features[train_idx]
+            self.target = self.target[train_idx]
+            self.group = self.group[train_idx]
 
         self.model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=PreProcess._K_FOLDS,
                                   n_jobs=PreProcess._MALTY_PROCESSES).fit(features,
                                                                           target).best_estimator_
 
         consol.log("[green] greed search hes done")
-
 
     @staticmethod
     def _print_out(data):
@@ -204,7 +204,7 @@ class PreProcess:
 
     def show_features(self):
         """
-        print the feathers by spectate
+        print your features
         :return:
         """
         p = Process(target=PreProcess._print_out, args=[self.features.copy()])
@@ -238,12 +238,12 @@ class PreProcess:
         :param input_data: the data (type: pandas data frame or pandas series)
         :return: the data himself, the number of his columns, the values of his columns (type: numpy array)
         """
-        if isinstance(input_data, pd.DataFrame):
+        if isinstance(input_data, pd.DataFrame):  # for data frame
             data = input_data.to_numpy()
             name = input_data.columns.values
             size: int = data.shape[1]
 
-        elif isinstance(input_data, pd.Series):
+        elif isinstance(input_data, pd.Series):  # for pandas serias
             data = input_data.to_numpy()
             data = np.reshape(data, (data.size, 1))
             size: int = input_data.shape
