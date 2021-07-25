@@ -14,7 +14,7 @@ from rich import print
 from rich.console import Console
 from scipy.signal import savgol_filter as sgf
 from sklearn.feature_selection import SelectKBest
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 
@@ -173,31 +173,40 @@ class PreProcess:
             if not isinstance(value, list):
                 value = [value]
             tamp.update({parmeter: value})
+
+        gss = GroupShuffleSplit(n_splits=1, train_size=0.9, random_state=42)
+        gss.get_n_splits()
+        for train_idx, test_idx in gss.split(self.features,self.target, self.group):
+            features=self.features[test_idx]
+            target=self.target[test_idx]
+            self.features=self.features[train_idx]
+            self.target=self.target[train_idx]
+            self.group=self.group[train_idx]
+
         self.model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=PreProcess._K_FOLDS,
-                                  n_jobs=PreProcess._MALTY_PROCESSES).fit(self.features,
-                                                                          self.target).best_estimator_
+                                  n_jobs=PreProcess._MALTY_PROCESSES).fit(features,
+                                                                          target).best_estimator_
 
         consol.log("[green] greed search hes done")
 
-    def group_by(self):
-        df = np.concatenate([self.features, self.target, self.group], axis=1)
-        col = lists_solver([self.features_name.tolist(), self.name, "group"])
-        df = pd.DataFrame(data=df, columns=col).groupby("group").mean()
-        features = df.iloc[:, :-1]
-        target = df.iloc[:, -1]
-        self.features=features.copy()
-        self.target=target.copy()
-        self.group = np.array(range(self.target.shape[0])).reshape([self.target.shape[0], 1])
 
     @staticmethod
     def _print_out(data):
+        """
+        printing data frames (use to send to different trade)
+        :param data: the data frame thet you want to print (type: data frame)
+        :return:
+        """
         data = data
         tamp_df = pd.DataFrame(data)
         tamp_df.T.plot()
         plt.show()
 
     def show_features(self):
-
+        """
+        print the feathers by spectate
+        :return:
+        """
         p = Process(target=PreProcess._print_out, args=[self.features.copy()])
         p.start()
 
@@ -239,11 +248,6 @@ class PreProcess:
             data = np.reshape(data, (data.size, 1))
             size: int = input_data.shape
             name = input_data.name
-
-        elif isinstance(input_data, np.array):
-            data = input_data
-            name = None
-            size: int = data.shape[1]
 
         else:
             sys.exit("un know object kind")
