@@ -50,7 +50,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
     def __str__(self):
         return f"all my group classification tools"
 
-    def model_modifying(self, *changes):
+    def grid_search(self, *changes):
         """
         modifying your model
         :param changes: tuples when [0] is the parameter name and [1] is a list of parameter options
@@ -62,7 +62,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         if Classification._GLOBAL_MODEL_SETTING is not None:
             for i in Classification._GLOBAL_MODEL_SETTING:
                 changes_list.append(i)
-        super().model_modifying(changes_list)
+        super().grid_search(changes_list)
         self.__modified = False
 
     def sacrifice_rate_setter(self, sacrifice_rate=0):
@@ -127,7 +127,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         method = spelling_fixer(method, voting_systems)
 
         if self.__modified and Classification._GLOBAL_MODEL_SETTING is not None:
-            super().model_modifying(tuple(Classification._GLOBAL_MODEL_SETTING))
+            super().grid_search(tuple(Classification._GLOBAL_MODEL_SETTING))
             self.__modified = False
 
         if isinstance(Classification.__CORES_LIMIT, int):

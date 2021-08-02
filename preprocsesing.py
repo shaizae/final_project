@@ -156,9 +156,9 @@ class PreProcess:
         consol.log("[green] feature selection done")
         return self.features_name
 
-    def model_modifying(self, changes):
+    def grid_search(self, changes):
         """
-        modifying you're model for perfect classification can use for greed search
+        grid search in youer model
         :param changes: list of tuples that the first argument in ech tuple is the parameter and the second is the value
         :return:
         """
@@ -169,7 +169,7 @@ class PreProcess:
         tamp = {}
         parms = list(self.model.get_params().keys())
         for parmeter, value in changes:  # save the data as dictionary so its can be used
-            parmeter = spelling_fixer(parmeter, parms)
+            parmeter = spelling_fixer(parmeter, parms) # looking for spell mistakes
 
             if not isinstance(value, list):
                 value = [value]
@@ -189,6 +189,22 @@ class PreProcess:
                                                                           target).best_estimator_
 
         consol.log("[green] greed search hes done")
+
+    def model_modulation(self,changes):
+        """
+        set the model parameters no grid search
+        :param changes: tuple of the changes (type: tuple of tuples wen index 0 is parameter name and index 1 is parameters value)
+        :return: None
+        """
+        tamp = {}
+        parms = list(self.model.get_params().keys())
+        for parmeter, value in changes:  # save the data as dictionary so its can be used
+            parmeter = spelling_fixer(parmeter, parms) # looking for spell mistakes
+            tamp.update({parmeter: value})
+
+        self.model=self.model.set_params(**tamp)
+        print()
+
 
     @staticmethod
     def _print_out(data):
