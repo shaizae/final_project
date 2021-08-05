@@ -19,6 +19,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
     _GLOBAL_MODEL_SETTING = None
     BOOTSTRAP: bool = False
     SMOOTE: bool = False
+    PCA: int =0
 
     def __init__(self, features, target, model="random", group=None):
         """
@@ -44,7 +45,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         self.to_save_prediction = None
         self.to_save_probability = None
         super()._class_mod_dis(model=model)
-        self.__modified = True
+        self._modified = True
         self.roc_index=[]
 
     def __str__(self):
@@ -63,7 +64,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             for i in Classification._GLOBAL_MODEL_SETTING:
                 changes_list.append(i)
         super().grid_search(changes_list)
-        self.__modified = False
+        self._modified = False
 
     def sacrifice_rate_setter(self, sacrifice_rate=0):
         self._sacrifice_rate = sacrifice_rate
@@ -115,6 +116,13 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
         return feature, target
 
+    @staticmethod
+    def _PCA(feature, target):
+        pca = PCA(n_components=Classification.PCA)
+        feature = pca.fit_transform(feature)
+        target=pca.transform(target)
+        return feature,target
+
     def _voting_systems(self, method, out, fix_list=True):
         """
         voting system manager
@@ -126,9 +134,9 @@ class Classification(ClassificationPreprocessing, PostProcess):
 
         method = spelling_fixer(method, voting_systems)
 
-        if self.__modified and Classification._GLOBAL_MODEL_SETTING is not None:
+        if self._modified and Classification._GLOBAL_MODEL_SETTING is not None:
             super().grid_search(tuple(Classification._GLOBAL_MODEL_SETTING))
-            self.__modified = False
+            self._modified = False
 
         if isinstance(Classification.__CORES_LIMIT, int):
             pool = Pool(Classification.__CORES_LIMIT)
@@ -360,7 +368,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
             group = np.squeeze(self.group)
         except:
             group = self.group.copy()
-        self.__modified = False
+        self._modified = False
         loo = GroupKFold(number_of_folds)
         loo.get_n_splits(X=self.features, y=self.target, groups=group)
         number_of_featchers_out = []
@@ -583,11 +591,7 @@ def _no_vote(arguments_input):
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
-    if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
-                                                                             train_group)
-    if Classification.SMOOTE:
-        feature_train, target_train = Classification.__smoote(feature_train, target_train)
+    feature_train, target_train = balancing_system(feature_train, target_train, train_group)
     model.fit(feature_train, target_train)
     prediction = model.predict(feature_test)
     prediction = prediction.tolist()
@@ -604,11 +608,8 @@ def _most_likelihood(arguments_input):
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
-    if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
-                                                                             train_group)
-    if Classification.SMOOTE:
-        feature_train, target_train = Classification.__smoote(feature_train, target_train)
+
+    feature_train, target_train = balancing_system(feature_train, target_train, train_group)
     model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
     try:
@@ -656,11 +657,9 @@ def _majority_vote(arguments_input):
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
     model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
-    if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,
-                                                                             train_group)
-    if Classification.SMOOTE:
-        feature_train, target_train = Classification.__smoote(feature_train, target_train)
+
+    feature_train, target_train=balancing_system(feature_train, target_train, train_group)
+
     model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
     try:
@@ -689,3 +688,12 @@ def _majority_vote(arguments_input):
 
     out_put = [label, predictions, probabilities]
     return out_put
+def balancing_system(feature_train, target_train, train_group):
+    if Classification.PCA!=0:
+        feature_train,target_train=Classification._PCA(feature_train, target_train)
+    if Classification.BOOTSTRAP:
+        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,                                                                     train_group)
+    if Classification.SMOOTE:
+        feature_train, target_train = Classification._smoote(feature_train, target_train)
+
+    return feature_train, target_train

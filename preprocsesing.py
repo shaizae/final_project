@@ -22,41 +22,6 @@ warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 
 
-def spelling_fixer(input_string, check_string):  # we had some dyslectic on the crow
-    """
-    fixing minor spelling mistakes
-    :param input_string: the word you like to compere (type: string)
-    :param check_string: list of strings to comparing whit (type: list of strings)
-    :return: the closest word
-    """
-    if input_string not in check_string:
-        chosen_word = get_close_matches(input_string, check_string, n=1)
-        try:
-            chosen_word = chosen_word[0]
-        except:
-            sys.exit(f"cant find close enough to the word {input_string} so system shout down")
-        console = Console(color_system="windows")
-        console.print(f"[blue]the word {input_string} is replaced by {chosen_word}[/blue]")
-        return chosen_word
-    else:
-        return input_string
-
-
-def dic_uniting(d1, d2):
-    """
-    unite two dictionaries whit the same parameters and tern the values to list of values
-    :param d1: the first dictionary (type: dict)
-    :param d2: the second dictionary (type: dict)
-    :return:
-    """
-    dd = defaultdict(list)
-
-    for d in (d1, d2):  # you can list as many input dicts as you want here
-        for key, value in d.items():
-            dd[key].append(value)
-    return dd
-
-
 class PreProcess:
     """
     prepossessing and training tool for dummies
@@ -79,7 +44,7 @@ class PreProcess:
     def __len__(self):
         return self.features.shape[0]
 
-    def preprocessing(self, preprocessing_list=None, derivative=2, pca_components=None):
+    def preprocessing(self, preprocessing_list=None, derivative=2):
         """
         the preprocessing sequins for the training set
         :param preprocessing_list: list of the preprocessing methods (type: list)
@@ -87,7 +52,7 @@ class PreProcess:
         norm: normalize the data
         offset: offset the data
         """
-        optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization", "PCA"]
+        optinons_list = ["sgf", "norm", "offset", "drop_None", "opus_normalization"]
         for i in preprocessing_list:
             i = spelling_fixer(i, optinons_list)
             if i == "sgf":  # using sagalov filter to smote and divert data (it's c++ librerry os its not clean memory
@@ -121,10 +86,6 @@ class PreProcess:
                 features = np.array(squares(self.features[:, :])).sum(axis=1)
                 for num, j in enumerate(features):
                     self.features[num, :] /= j
-
-            elif i == "PCA":  # do PCA to all the data
-                pca = PCA(n_components=pca_components)
-                self.features = pca.fit_transform(self.features)
 
     def expend_features(self, expend):
         """
@@ -169,7 +130,7 @@ class PreProcess:
         tamp = {}
         parms = list(self.model.get_params().keys())
         for parmeter, value in changes:  # save the data as dictionary so its can be used
-            parmeter = spelling_fixer(parmeter, parms) # looking for spell mistakes
+            parmeter = spelling_fixer(parmeter, parms)  # looking for spell mistakes
 
             if not isinstance(value, list):
                 value = [value]
@@ -190,7 +151,7 @@ class PreProcess:
 
         consol.log("[green] greed search hes done")
 
-    def model_modulation(self,changes):
+    def model_modulation(self, changes):
         """
         set the model parameters no grid search
         :param changes: tuple of the changes (type: tuple of tuples wen index 0 is parameter name and index 1 is parameters value)
@@ -199,12 +160,11 @@ class PreProcess:
         tamp = {}
         parms = list(self.model.get_params().keys())
         for parmeter, value in changes:  # save the data as dictionary so its can be used
-            parmeter = spelling_fixer(parmeter, parms) # looking for spell mistakes
+            parmeter = spelling_fixer(parmeter, parms)  # looking for spell mistakes
             tamp.update({parmeter: value})
 
-        self.model=self.model.set_params(**tamp)
-        print()
-
+        self.model = self.model.set_params(**tamp)
+        self._modified=False
 
     @staticmethod
     def _print_out(data):
@@ -312,3 +272,38 @@ def lists_solver(input_list):
         else:
             list_out.append(i)
     return list_out
+
+
+def spelling_fixer(input_string, check_string):  # we had some dyslectic on the crow
+    """
+    fixing minor spelling mistakes
+    :param input_string: the word you like to compere (type: string)
+    :param check_string: list of strings to comparing whit (type: list of strings)
+    :return: the closest word
+    """
+    if input_string not in check_string:
+        chosen_word = get_close_matches(input_string, check_string, n=1)
+        try:
+            chosen_word = chosen_word[0]
+        except:
+            sys.exit(f"cant find close enough to the word {input_string} so system shout down")
+        console = Console(color_system="windows")
+        console.print(f"[blue]the word {input_string} is replaced by {chosen_word}[/blue]")
+        return chosen_word
+    else:
+        return input_string
+
+
+def dic_uniting(d1, d2):
+    """
+    unite two dictionaries whit the same parameters and tern the values to list of values
+    :param d1: the first dictionary (type: dict)
+    :param d2: the second dictionary (type: dict)
+    :return:
+    """
+    dd = defaultdict(list)
+
+    for d in (d1, d2):  # you can list as many input dicts as you want here
+        for key, value in d.items():
+            dd[key].append(value)
+    return dd
