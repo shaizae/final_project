@@ -19,7 +19,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
     _GLOBAL_MODEL_SETTING = None
     BOOTSTRAP: bool = False
     SMOOTE: bool = False
-    PCA: int =0
+    PCA: int = 0
 
     def __init__(self, features, target, model="random", group=None):
         """
@@ -46,7 +46,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         self.to_save_probability = None
         super()._class_mod_dis(model=model)
         self._modified = True
-        self.roc_index=[]
+        self.roc_index = []
 
     def __str__(self):
         return f"all my group classification tools"
@@ -117,11 +117,11 @@ class Classification(ClassificationPreprocessing, PostProcess):
         return feature, target
 
     @staticmethod
-    def _PCA(feature, target):
+    def _PCA(train, test):
         pca = PCA(n_components=Classification.PCA)
-        feature = pca.fit_transform(feature)
-        target=pca.transform(target)
-        return feature,target
+        train = pca.fit_transform(train)
+        test = pca.transform(test)
+        return train, test
 
     def _voting_systems(self, method, out, fix_list=True):
         """
@@ -207,8 +207,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
         else:
             consol.log("[green] training done")
             super()._classification_local_report(labels=labels, predictions=predictions, roc_labels=roc_labels)
-            self.roc_groups= self.group[self.roc_index]
-            self.roc_labels=self.target[self.roc_index]
+            self.roc_groups = self.group[self.roc_index]
+            self.roc_labels = self.target[self.roc_index]
 
     def K_folds(self, number_of_folds=5, method="no_vote"):
         """
@@ -251,9 +251,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
         else:
             consol.log("[green] training done")
             super()._classification_local_report(labels=labels, predictions=predictions, roc_labels=roc_labels)
-            self.roc_groups= self.group[self.roc_index]
-            self.roc_labels=self.target[self.roc_index]
-
+            self.roc_groups = self.group[self.roc_index]
+            self.roc_labels = self.target[self.roc_index]
 
     def K_folds_stratified(self, number_of_folds=5, method="no_vote"):
         """
@@ -590,9 +589,7 @@ def _no_vote(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
-    feature_train, target_train = balancing_system(feature_train, target_train, train_group)
-    model.fit(feature_train, target_train)
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
     prediction = model.predict(feature_test)
     prediction = prediction.tolist()
     probability = model.predict_proba(feature_test)
@@ -607,10 +604,8 @@ def _most_likelihood(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
 
-    feature_train, target_train = balancing_system(feature_train, target_train, train_group)
-    model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
     try:
         local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
@@ -656,11 +651,9 @@ def _majority_vote(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
 
-    feature_train, target_train=balancing_system(feature_train, target_train, train_group)
 
-    model.fit(feature_train, target_train)
     group_u = np.unique(test_group)
     try:
         local_df = np.concatenate((feature_test, target_test, test_group), axis=1)
@@ -688,12 +681,25 @@ def _majority_vote(arguments_input):
 
     out_put = [label, predictions, probabilities]
     return out_put
-def balancing_system(feature_train, target_train, train_group):
-    if Classification.PCA!=0:
-        feature_train,target_train=Classification._PCA(feature_train, target_train)
+
+
+def _input_classification_system(arguments_input):
+    """
+    every proses that need to run sepredly on every train set
+    :param feature_train: the training fetchers
+    :param target_train: the training target
+    :param train_group: the training group
+    :return: the modulated fetchers and
+    """
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
+
+    if Classification.PCA != 0:
+        feature_train, feature_test = Classification._PCA(feature_train, feature_test)
     if Classification.BOOTSTRAP:
-        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train,                                                                     train_group)
+        feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train, train_group)
     if Classification.SMOOTE:
         feature_train, target_train = Classification._smoote(feature_train, target_train)
 
-    return feature_train, target_train
+    model.fit(feature_train, target_train)
+
+    return model, feature_train, target_train, feature_test, target_test, train_group, test_group
