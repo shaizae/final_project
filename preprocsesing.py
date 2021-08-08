@@ -157,15 +157,17 @@ class PreProcess:
         :param changes: tuple of the changes (type: tuple of tuples wen index 0 is parameter name and index 1 is parameters value)
         :return: None
         """
-        tamp = {}
-        parms = list(self.model.get_params().keys())
-        for parmeter, value in changes:  # save the data as dictionary so its can be used
-            parmeter = spelling_fixer(parmeter, parms)  # looking for spell mistakes
-            tamp.update({parmeter: value})
-        consol = Console(color_system="windows")
-        consol.log("[green] model hes been modulated")
-
-        self.model = self.model.set_params(**tamp)
+        if type(changes) is dict:
+            self.model=self.model.set_params(**changes)
+        else:
+            tamp = {}
+            parms = list(self.model.get_params().keys())
+            for parmeter, value in changes:  # save the data as dictionary so its can be used
+                parmeter = spelling_fixer(parmeter, parms)  # looking for spell mistakes
+                tamp.update({parmeter: value})
+            consol = Console(color_system="windows")
+            consol.log("[green] model hes been modulated")
+            self.model = self.model.set_params(**tamp)
         self._modified=False
 
     @staticmethod
