@@ -27,8 +27,8 @@ class PreProcess:
     prepossessing and training tool for dummies
     """
     _GLOBAL_MODEL_SETTING: list = ""
-    _K_FOLDS = None
-    _MALTY_PROCESSES = None
+    _K_FOLDS = 5
+    _MALTY_PROCESSES = os.cpu_count()-2
 
     def __init__(self, X, y):
         """
@@ -125,7 +125,7 @@ class PreProcess:
         """
 
         consol = Console(color_system="windows")
-        consol.log("[green] greed search hes started")
+        consol.log("[green] grid search hes started")
 
         tamp = {}
         parms = list(self.model.get_params().keys())
@@ -149,7 +149,7 @@ class PreProcess:
                                   n_jobs=PreProcess._MALTY_PROCESSES).fit(features,
                                                                           target).best_estimator_
 
-        consol.log("[green] greed search hes done")
+        consol.log("[green] grid search hes done")
 
     def model_modulation(self, changes):
         """
@@ -162,6 +162,8 @@ class PreProcess:
         for parmeter, value in changes:  # save the data as dictionary so its can be used
             parmeter = spelling_fixer(parmeter, parms)  # looking for spell mistakes
             tamp.update({parmeter: value})
+        consol = Console(color_system="windows")
+        consol.log("[green] model hes been modulated")
 
         self.model = self.model.set_params(**tamp)
         self._modified=False

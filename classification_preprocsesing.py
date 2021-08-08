@@ -25,7 +25,7 @@ class ClassificationPreprocessing(PreProcess):
         self.to_save_probability = None
         self._for_train = None
 
-    def feature_selection(self, number_of_features=None, tech=chi2, ret=True):
+    def feature_selection(self, number_of_features=None, tech=chi2):
         """
         :param tech: decide the scoring technique
         :param number_of_features: the number of features_size that you want to check (type: int)
@@ -34,8 +34,7 @@ class ClassificationPreprocessing(PreProcess):
         """
 
         features = super().feature_selection(number_of_features=number_of_features, teck=tech)
-        if ret:
-            return features
+        return features
 
     def _class_mod_dis(self, model):
         """
