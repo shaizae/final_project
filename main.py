@@ -11,7 +11,7 @@ if __name__ == "__main__":
     model.feature_selection(15)  # use fetchers selection by chi 2 algorithm
     model.grid_search(("kernel", ["linear", "poly", "rbf"]), ("degree", [1, 2, 3, 4]),
                       ("probability", True))  # grid search dropping 10% as dave
-    model.leave_one_out()  # leave one out validation
+    model.leave_one_out(method="most_likelihoods")  # leave one out validation can vote inside groups
     model.save_classification_report("test")  # save the report that print on the terminal
     model.save_classification_probability("test")  # save the classification probabilities
     model.show_roc("test")  # save the roc plot
