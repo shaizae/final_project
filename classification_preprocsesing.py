@@ -83,7 +83,7 @@ class ClassificationPreprocessing(PreProcess):
             present_matrix[1, 1] = self.confusion_matrix_[1, 1] / (
                     self.confusion_matrix_[1, 0] + self.confusion_matrix_[1, 1]) * 100
             file_name = str(name + " " + ClassificationPreprocessing.ADD_TO_REPORT + ".txt")
-            with open(file_name, "w+")as file:  # wraith all the parameters to the report
+            with open(file_name, "w+") as file:  # wraith all the parameters to the report
                 file.write("classifier: ")
                 file.write(self.model_name)
                 file.write("\n")
@@ -225,6 +225,7 @@ class ClassificationPreprocessing(PreProcess):
                                                                       self.to_save_probability[:, 1])
         self.auc_roc_ = metrics.auc(self.fpr_, self.tpr_)
         self.auc_det_ = metrics.auc(self.fpr_det_, self.tpr_det_)
+        print(f"AUC: {self.auc_roc_}")
 
     def print_class_waits(self):
         """
@@ -238,9 +239,10 @@ class ClassificationPreprocessing(PreProcess):
         for (i, j) in zip(sample, count):
             print(str(i) + ":" + str(j))
 
-    def optimal_cut_point_on_roc_(self, delta_max=0.8, plot_point_on_ROC=False):
+    def optimal_cut_point_on_roc_(self, delta_max=0.8, plot_point_on_ROC=False, save_report=None):
         """
         print the optimal cut on you're roc curve
+        :param save_report: if you like to save local report (type: string)
         :param delta_max: the maximum delta between tpr and fpr (type: flute between 0 to 1)
         :param plot_point_on_ROC: is you like to show the roc curve now (type:bool)
         :return: report on you're optimal working point (type: dictionary)
@@ -264,13 +266,19 @@ class ClassificationPreprocessing(PreProcess):
         precision_1 = (n_p * sen[np.argmax(acc)]) / (n_p * sen[np.argmax(acc)] + n_n * (1 - spe[np.argmax(acc)]))
         precision_2 = (n_n * spe[np.argmax(acc)]) / (n_n * spe[np.argmax(acc)] + n_p * (1 - sen[np.argmax(acc)]))
 
-        report = {"auc": np.around(auc, 2), "acc": np.around(acc.max(), 2), "recall_1": np.around(recall_1, 2),
-                  "recall_2": np.around(recall_2, 2), "precision_1": np.around(precision_1, 2),
-                  "precision_2": np.around(precision_2, 2)
+        report = {"auc": np.around(auc, 2), "acc": np.around(acc.max(), 2), "sen": np.around(recall_1, 2),
+                  "spe": np.around(recall_2, 2), "npv": np.around(precision_1, 2),
+                  "ppv": np.around(precision_2, 2)
                   }
         if plot_point_on_ROC:
-            p = Process(target=ClassificationPreprocessing, args=(fpr, tpr, best_point,))
+            p = Process(target=ClassificationPreprocessing._plot_optimal_cut, args=(fpr, tpr, best_point,))
             p.start()
+
+        if save_report is not None:
+            with open(str(save_report) + ".txt", "w") as f:
+                for key, valu in report.items():
+                    f.write(str(key) + ": " + str(valu) + "\n")
+        print(report)
 
         return report
 

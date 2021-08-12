@@ -16,7 +16,7 @@ from scipy.signal import savgol_filter as sgf
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.decomposition import PCA
+
 
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
@@ -27,8 +27,8 @@ class PreProcess:
     prepossessing and training tool for dummies
     """
     _GLOBAL_MODEL_SETTING: list = ""
-    _K_FOLDS = 5
-    _MALTY_PROCESSES = os.cpu_count()-2
+    _K_FOLDS: int = 5
+    _MALTY_PROCESSES: int = os.cpu_count() - 2
 
     def __init__(self, X, y):
         """
@@ -141,10 +141,15 @@ class PreProcess:
         for train_idx, test_idx in gss.split(self.features, self.target, self.group):  # this loop splitting dav out
             features = self.features[test_idx]
             target = self.target[test_idx]
+            group = self.group[test_idx]
             self.features = self.features[train_idx]
             self.target = self.target[train_idx]
             self.group = self.group[train_idx]
-
+            col = lists_solver([self.features_name.tolist(), "target", "group"])
+            df = pd.DataFrame(data=np.concatenate([features, target, group], axis=1), columns=col)
+            df = df.groupby("group").mean()
+            features = df.iloc[:, :-1].values
+            target = df.iloc[:, -1].values
         self.model = GridSearchCV(estimator=self.model, param_grid=tamp, scoring='accuracy', cv=PreProcess._K_FOLDS,
                                   n_jobs=PreProcess._MALTY_PROCESSES).fit(features,
                                                                           target).best_estimator_
@@ -158,7 +163,7 @@ class PreProcess:
         :return: None
         """
         if type(changes) is dict:
-            self.model=self.model.set_params(**changes)
+            self.model = self.model.set_params(**changes)
         else:
             tamp = {}
             parms = list(self.model.get_params().keys())
@@ -168,7 +173,7 @@ class PreProcess:
             consol = Console(color_system="windows")
             consol.log("[green] model hes been modulated")
             self.model = self.model.set_params(**tamp)
-        self._modified=False
+        self._modified = False
 
     @staticmethod
     def _print_out(data):

@@ -1,10 +1,11 @@
 from multiprocessing import Pool
-
 from imblearn.over_sampling import SMOTE
+from sklearn.decomposition import PCA
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import LeaveOneGroupOut, GroupKFold, StratifiedKFold
 from sklearn.utils import resample
+from sklearn.preprocessing import StandardScaler
 
 from classification_preprocsesing import *
 from postprocess import *
@@ -17,9 +18,6 @@ class Classification(ClassificationPreprocessing, PostProcess):
     """
     __CORES_LIMIT: int = None
     _GLOBAL_MODEL_SETTING = None
-    BOOTSTRAP: bool = False
-    SMOOTE: bool = False
-    PCA: int = 0
 
     def __init__(self, features, target, model="random", group=None):
         """
@@ -30,10 +28,6 @@ class Classification(ClassificationPreprocessing, PostProcess):
         super().__init__(features, target)
         if group is not None:
             self.group, _, _ = PreProcess._input_sequence(group)
-            if Classification.SMOOTE:
-                console = Console(color_system="windows")
-                console.print(f"[blue]cant use smote on grouped data[/blue]")
-                Classification.SMOOTE = False
         else:
             self.group = np.array(range(self.target.shape[0])).reshape([self.target.shape[0], 1])
         self.target = self.target.astype(int)
@@ -45,8 +39,14 @@ class Classification(ClassificationPreprocessing, PostProcess):
         self.to_save_prediction = None
         self.to_save_probability = None
         super()._class_mod_dis(model=model)
-        self._modified = True
+        self._modified: bool = True
+        self.roc_groups = None
+        self.roc_labels = None
         self.roc_index = []
+        self.standart_scaling: bool = False
+        self.pca: int = 0
+        self.bootstrap: bool = False
+        self.smoote: bool = False
 
     def __str__(self):
         return f"all my group classification tools"
@@ -69,6 +69,35 @@ class Classification(ClassificationPreprocessing, PostProcess):
     def sacrifice_rate_setter(self, sacrifice_rate=0):
         self._sacrifice_rate = sacrifice_rate
         self._sacrifice_rate_flag = True
+
+    def in_training_process(self, standart_scaling=False, pca=0, bootstrap=False, smoote=False):
+        """
+        set all the processes the applied only inside training
+        :param standart_scaling: if you like to apply standard scaling on you're data (type: bool)
+        :param pca: if you like to apply PCA on you're data (type: int)
+        :param bootstrap: if you like to balance you're data by bootstrap (type: bool)
+        :param smoote: if you like to balance you're data by smoote (type: bool)
+        :return:
+        """
+        self.standart_scaling = standart_scaling
+        self.pca = pca
+        self.bootstrap = bootstrap
+        self.smoote = smoote
+
+    @classmethod
+    def in_training_process_global(cls, standart_scaling=False, pca=0, bootstrap=False, smoote=False):
+        """
+        set all the processes the applied only inside training on every instances you crate
+        :param standart_scaling: if you like to apply standard scaling on you're data (type: bool)
+        :param pca: if you like to apply PCA on you're data (type: int)
+        :param bootstrap: if you like to balance you're data by bootstrap (type: bool)
+        :param smoote: if you like to balance you're data by smoote (type: bool)
+        :return:
+        """
+        cls.standart_scaling = standart_scaling
+        cls.pca = pca
+        cls.bootstrap = bootstrap
+        cls.smoote = smoote
 
     @staticmethod
     def _bootstrap(feature, target, group):
@@ -104,7 +133,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         return features, target, group
 
     @staticmethod
-    def __smoote(feature, target):
+    def _smoote(feature, target):
         """
         bootstrap the classification data
         :param feature: the classification features
@@ -117,8 +146,21 @@ class Classification(ClassificationPreprocessing, PostProcess):
         return feature, target
 
     @staticmethod
-    def _PCA(train, test):
-        pca = PCA(n_components=Classification.PCA)
+    def _standard_scale(train, test):
+        """
+        standard scale the feathers (see: sklearn.preprocessing.StandardScaler documentation)
+        :param train: the train feathers (type: np.array)
+        :param test: the test feathers (type: np.array)
+        :return: the train and test feathers after the re scaling
+        """
+        sds = StandardScaler()
+        train = sds.fit_transform(train)
+        test = sds.transform(test)
+        return train, test
+
+    @staticmethod
+    def _PCA(train, test,pca):
+        pca = PCA(n_components=pca)
         train = pca.fit_transform(train)
         test = pca.transform(test)
         return train, test
@@ -187,10 +229,11 @@ class Classification(ClassificationPreprocessing, PostProcess):
         for train_index, test_index in loo.split(X=self.features, y=self.target, groups=group):
             feature_train, feature_test = self.features[train_index], self.features[test_index]
             target_train, target_test = self.target[train_index], self.target[test_index]
-            train_group, test_group = self.group[train_index], self.group[test_index]
+            train_group, test_group = self.group[train_index].copy(), self.group[test_index].copy()
 
             out.append(
-                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group,
+                 self.standart_scaling, self.pca, self.bootstrap, self.smoote])
             roc_labels.extend(target_test)
             self.roc_index.extend(test_index)
 
@@ -233,7 +276,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             train_group, test_group = self.group[train_index], self.group[test_index]
 
             out.append(
-                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group,
+                 self.standart_scaling, self.pca, self.bootstrap, self.smoote])
             roc_labels.extend(target_test)
             self.roc_index.extend(test_index)
 
@@ -294,7 +338,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             feature_test = df_test.values
 
             out.append(
-                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group,
+                 self.standart_scaling, self.pca, self.bootstrap, self.smoote])
 
         labels, predictions = self._voting_systems(method=method, out=out)
 
@@ -333,7 +378,8 @@ class Classification(ClassificationPreprocessing, PostProcess):
             train_group, test_group = self.group[train_index], self.group[test_index]
 
             out.append(
-                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group])
+                [clone(self.model), feature_train, target_train, feature_test, target_test, train_group, test_group,
+                 self.standart_scaling, self.pca, self.bootstrap, self.smoote])
             self._for_train = [target_test, test_group]
 
         labels, predictions = self._voting_systems(method=method, out=out)
@@ -408,11 +454,11 @@ class Classification(ClassificationPreprocessing, PostProcess):
                     test_group)
 
                 if method == "majority_vote":
-                    voted_data = _majority_vote(send_for_test)
+                    voted_data = Classification._majority_vote(send_for_test)
                 elif method == "most_likelihoods":
-                    voted_data = _most_likelihood(send_for_test)
+                    voted_data = Classification._most_likelihood(send_for_test)
                 elif method == "no_vote":
-                    voted_data = _no_vote(send_for_test)
+                    voted_data = Classification._no_vote(send_for_test)
                 else:
                     sys.exit("un know method")
 
@@ -452,10 +498,14 @@ class Classification(ClassificationPreprocessing, PostProcess):
         features = self.features.copy()
         target = self.target.copy()
 
-        if Classification.BOOTSTRAP:
+        if self.standart_scaling:
+            features = StandardScaler().fit_transform(features)
+        if self.pca!=0:
+            features = PCA(n_components=self.pca).fit_transform(features)
+        if self.bootstrap:
             features, target, _ = Classification._bootstrap(features, target,
                                                             self.group)
-        if Classification.SMOOTE:
+        if self.smoote:
             features, target = Classification.__smoote(features, target)
         model = self.model.fit(features, target)
 
@@ -481,7 +531,7 @@ class Classification(ClassificationPreprocessing, PostProcess):
         #     if i < 0.5:
         #         y_prob[num] = 1 - i
         thresholdes = np.arange(min_thr, max_thr, steps_thr)
-        std = np.std(y_prob)
+        # std = np.std(y_prob)
 
         rat = np.arange(0, 0.5, 0.01)
         samples_sacrifice_rate = []
@@ -589,7 +639,8 @@ def _no_vote(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(
+        arguments_input)
     prediction = model.predict(feature_test)
     prediction = prediction.tolist()
     probability = model.predict_proba(feature_test)
@@ -604,7 +655,8 @@ def _most_likelihood(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(
+        arguments_input)
 
     group_u = np.unique(test_group)
     try:
@@ -651,8 +703,8 @@ def _majority_vote(arguments_input):
     :param arguments_input: tuple of (model, feature train, target train, feature test, target test, train group, test group)
     :return:list of [original labels,labels after classification, the posterior probabilities]
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(arguments_input)
-
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group = _input_classification_system(
+        arguments_input)
 
     group_u = np.unique(test_group)
     try:
@@ -691,13 +743,17 @@ def _input_classification_system(arguments_input):
     :param train_group: the training group
     :return: the modulated fetchers and
     """
-    model, feature_train, target_train, feature_test, target_test, train_group, test_group = arguments_input
 
-    if Classification.PCA != 0:
-        feature_train, feature_test = Classification._PCA(feature_train, feature_test)
-    if Classification.BOOTSTRAP:
+    model, feature_train, target_train, feature_test, target_test, train_group, test_group, standart_scaling, pca, bootstrap, smoote = arguments_input
+
+    if standart_scaling:
+        feature_train, feature_test = Classification._standard_scale(feature_train, feature_test)
+
+    if pca != 0:
+        feature_train, feature_test = Classification._PCA(feature_train, feature_test,pca)
+    if bootstrap:
         feature_train, target_train, train_group = Classification._bootstrap(feature_train, target_train, train_group)
-    if Classification.SMOOTE:
+    if smoote:
         feature_train, target_train = Classification._smoote(feature_train, target_train)
 
     model.fit(feature_train, target_train)
